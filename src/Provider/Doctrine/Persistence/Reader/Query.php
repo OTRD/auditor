@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace DH\Auditor\Provider\Doctrine\Persistence\Reader;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use DH\Auditor\Exception\InvalidArgumentException;
 use DH\Auditor\Model\Entry;
-use DH\Auditor\Provider\Doctrine\Persistence\Helper\SchemaHelper;
+use DH\Auditor\Provider\ConfigurationInterface;
+use DH\Auditor\Provider\Doctrine\Configuration;
 use DH\Auditor\Provider\Doctrine\Persistence\Reader\Filter\DateRangeFilter;
 use DH\Auditor\Provider\Doctrine\Persistence\Reader\Filter\FilterInterface;
 use DH\Auditor\Provider\Doctrine\Persistence\Reader\Filter\RangeFilter;
@@ -38,14 +41,20 @@ class Query
 
     private string $table;
 
+    private Configuration $configuration;
+
     private int $offset = 0;
 
     private int $limit = 0;
 
-    public function __construct(string $table, Connection $connection)
+    private DateTimeZone $timezone;
+
+    public function __construct(string $table, Connection $connection, ConfigurationInterface $configuration, string $timezone)
     {
         $this->connection = $connection;
         $this->table = $table;
+        $this->configuration = $configuration;
+        $this->timezone = new DateTimeZone($timezone);
 
         foreach ($this->getSupportedFilters() as $filterType) {
             $this->filters[$filterType] = [];
@@ -66,6 +75,7 @@ class Query
         $result = [];
         \assert($statement instanceof Result);
         foreach ($statement->fetchAllAssociative() as $row) {
+            $row['created_at'] = new DateTimeImmutable($row['created_at'], $this->timezone);
             $result[] = Entry::fromArray($row);
         }
 
@@ -150,7 +160,7 @@ class Query
 
     public function getSupportedFilters(): array
     {
-        return array_keys(SchemaHelper::getAuditTableIndices('fake'));
+        return array_keys($this->configuration->getAllIndices('fake'));
     }
 
     public function getFilters(): array

@@ -16,6 +16,7 @@ use DH\Auditor\Provider\Doctrine\Service\StorageService;
 use DH\Auditor\Tests\Provider\Doctrine\Persistence\Reader\ReaderTest;
 use Doctrine\ORM\Mapping\ClassMetadata as ORMMetadata;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use function count;
 
 /**
  * @see ReaderTest
@@ -48,14 +49,16 @@ class Reader
         $this->configureOptions($resolver);
         $config = $resolver->resolve($options);
 
+        $connection = $this->provider->getStorageServiceForEntity($entity)->getEntityManager()->getConnection();
+        $timezone = $this->provider->getAuditor()->getConfiguration()->getTimezone();
+
         /** @var StorageService $storageService */
         $storageService = $this->provider->getStorageServiceForEntity($entity);
 
-        $query = new Query($this->getEntityAuditTableName($entity), $storageService->getEntityManager()->getConnection());
+        $query = new Query($this->getEntityAuditTableName($entity), $connection, $this->provider->getConfiguration(), $timezone);
         $query
             ->addOrderBy(Query::CREATED_AT, 'DESC')
-            ->addOrderBy(Query::ID, 'DESC')
-        ;
+            ->addOrderBy(Query::ID, 'DESC');
 
         if (null !== $config['type']) {
             $query->addFilter(new SimpleFilter(Query::TYPE, $config['type']));
@@ -84,6 +87,12 @@ class Reader
             $query->addFilter(new SimpleFilter(Query::DISCRIMINATOR, $entity));
         }
 
+        foreach ($this->provider->getConfiguration()->getExtraIndices() as $indexedField => $extraIndexConfig) {
+            if (null !== $config[$indexedField]) {
+                $query->addFilter(new SimpleFilter($indexedField, $config[$indexedField]));
+            }
+        }
+
         return $query;
     }
 
@@ -108,6 +117,11 @@ class Reader
             ->setAllowedValues('page', static fn ($value) => null === $value || $value >= 1)
             ->setAllowedValues('page_size', static fn ($value) => null === $value || $value >= 1)
         ;
+
+        foreach ($this->provider->getConfiguration()->getExtraIndices() as $indexedField => $extraIndexConfig) {
+            $resolver->setDefault($indexedField, null);
+            $resolver->setAllowedTypes($indexedField, ['null', 'int', 'string', 'array']);
+        }
     }
 
     /**

@@ -23,6 +23,8 @@ class Entry
 
     protected string $diffs;
 
+    protected array $extra_fields = [];
+
     /**
      * @var null|int|string
      */
@@ -44,6 +46,28 @@ class Entry
     public function getId(): int
     {
         return $this->id;
+    }
+
+    public function setExtraField($key, $value = null): void
+    {
+        if ($key === (array)$key) {
+            $this->extra_fields = $key;
+        } else {
+            $this->extra_fields[$key] = $value;
+        }
+    }
+
+    public function getExtraField($key = '')
+    {
+        if ('' === $key) {
+            return $this->extra_fields;
+        }
+
+        if (isset($this->extra_fields[$key])) {
+            return $this->extra_fields[$key];
+        }
+
+        return null;
     }
 
     /**
@@ -142,6 +166,8 @@ class Entry
         foreach ($row as $key => $value) {
             if (property_exists($entry, $key)) {
                 $entry->{$key} = 'id' === $key ? (int) $value : $value;
+            } else {
+                $entry->extra_fields[$key] = $value;
             }
         }
 

@@ -106,19 +106,12 @@ class DoctrineProvider extends AbstractProvider
         $entity = $payload['entity'];
         unset($payload['table'], $payload['entity']);
 
-        $fields = [
-            'type' => ':type',
-            'object_id' => ':object_id',
-            'discriminator' => ':discriminator',
-            'transaction_hash' => ':transaction_hash',
-            'diffs' => ':diffs',
-            'blame_id' => ':blame_id',
-            'blame_user' => ':blame_user',
-            'blame_user_fqdn' => ':blame_user_fqdn',
-            'blame_user_firewall' => ':blame_user_firewall',
-            'ip' => ':ip',
-            'created_at' => ':created_at',
-        ];
+        $fields = array_combine(
+            array_keys($payload),
+            array_map(static function ($x) {
+                return ":{$x}";
+            }, array_keys($payload))
+        );
 
         $query = sprintf(
             'INSERT INTO %s (%s) VALUES (%s)',
